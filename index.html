@@ -79,16 +79,6 @@
     border-radius: 5px; background: var(--bg); color: var(--text);
   }
 
-  .summary {
-    background: var(--panel); border: 1px solid var(--rule);
-    border-left: 3px solid var(--c1); border-radius: 7px;
-    padding: 13px 15px; margin-bottom: 18px; font-size: 14.5px;
-  }
-  .summary b { font-weight: 600; }
-  .summary .r { color: var(--c1); } .summary .g { color: var(--c4); }
-  .summary p { margin: 0; }
-  .summary p + p { margin-top: 5px; color: var(--dim); font-size: 13px; }
-
   /* sidebar left, chart right */
   .main { display: grid; grid-template-columns: 244px 1fr; gap: 22px; align-items: start; }
   @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
@@ -174,11 +164,6 @@
     </label>
   </div>
 
-  <div class="summary">
-    <p id="headline"></p>
-    <p id="detail"></p>
-  </div>
-
   <div class="main">
     <div class="controls">
       <div>
@@ -254,7 +239,7 @@
 
   var el = {};
   ["pTrue","pBelief","price","start","bets","runs","vTrue","vBelief","vPrice","vStart","vBets",
-   "vRuns","headline","detail","tbody","cv","tabs","themeBtn","startBtn","resetBtn",
+   "vRuns","tbody","cv","tabs","themeBtn","startBtn","resetBtn",
    "betCount","fill","speed","gapnote"].forEach(function (id) { el[id] = document.getElementById(id); });
 
   var selected = "full", running = false, raf = null, S = null;
@@ -422,23 +407,7 @@
   }
 
   function drawStats() {
-    var rows = stats(), p = S.p, full = rows[0], flat = rows[3];
-    if (S.kelly <= 0) {
-      el.headline.innerHTML = "<b>Kelly says don't bet.</b> Your believed probability is at or below the contract price.";
-      el.detail.textContent = "There is no disagreement with the market to bet on.";
-    } else {
-      el.headline.innerHTML =
-        "Full Kelly bets <b>" + pc(S.kelly) + "</b> each time. So far it has ruined <b class=\"r\">" +
-        pc(full.ruin) + "</b> of runs; flat 2% has ruined <b class=\"g\">" + pc(flat.ruin) + "</b>.";
-      var gap = p.pBelief - p.pTrue;
-      el.detail.textContent = Math.abs(gap) < 0.005
-        ? "Belief matches truth — the only case where full Kelly is optimal. Move the sliders apart."
-        : gap > 0
-          ? "You are overestimating by " + (gap * 100).toFixed(0) + " points. Kelly on the truth would bet " +
-            pc(kelly(p.pTrue, p.price)) + ", so every full-Kelly bet here is too big."
-          : "You are underestimating by " + (-gap * 100).toFixed(0) + " points. Betting too small costs growth but not survival.";
-    }
-
+    var rows = stats(), p = S.p;
     el.tbody.innerHTML = rows.map(function (r) {
       var c = C(r.rule.color);
       return "<tr><td style=\"border-left-color:" + c + "\"><span class=\"dot\" style=\"background:" + c + "\"></span>" + r.rule.label + "</td>" +
