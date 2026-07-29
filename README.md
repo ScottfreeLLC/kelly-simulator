@@ -1,4 +1,4 @@
-# Kelly bankroll simulator
+# Kelly Bet Size Simulator
 
 **[Open the simulator →](https://scottfreellc.github.io/kelly-simulator/)**
 

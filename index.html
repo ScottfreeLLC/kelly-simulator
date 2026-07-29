@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kelly bankroll simulator</title>
+<title>Kelly Bet Size Simulator</title>
 
 <style>
   :root {
@@ -79,8 +79,10 @@
     border-radius: 5px; background: var(--bg); color: var(--text);
   }
 
-  /* sidebar left, chart right */
-  .main { display: grid; grid-template-columns: 244px 1fr; gap: 22px; align-items: start; }
+  /* Sidebar left, chart right. No align-items:start — the default
+     stretch is what makes both columns share a row height, so the
+     chart's bottom edge lands on the slider panel's. */
+  .main { display: grid; grid-template-columns: 244px 1fr; gap: 22px; }
   @media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
 
   .controls {
@@ -107,7 +109,10 @@
   .gapnote { padding: 9px 11px; background: var(--panel); border-radius: 5px; font-size: 12.5px; color: var(--dim); }
   .gapnote b { color: var(--text); font-weight: 600; }
 
-  .chartcard { border: 1px solid var(--rule); border-radius: 7px; overflow: hidden; }
+  .chartcard {
+    border: 1px solid var(--rule); border-radius: 7px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
   .tabs { display: flex; border-bottom: 1px solid var(--rule); background: var(--panel); flex-wrap: wrap; }
   .tabs button {
     font: inherit; font-size: 13px; padding: 10px 16px; cursor: pointer;
@@ -120,9 +125,12 @@
   .tabhint { margin-left: auto; align-self: center; padding: 0 14px; font-size: 12px; color: var(--dim); }
   @media (max-width: 780px) { .tabhint { display: none; } }
 
-  canvas { width: 100%; height: 560px; display: block; padding: 14px 16px 6px; }
-  @media (max-width: 900px) { canvas { height: 420px; } }
-  @media (max-width: 560px) { canvas { height: 320px; } }
+  /* Grows to fill whatever height the row has. No padding: a canvas
+     bitmap is scaled to the CONTENT box, so padding under border-box
+     sizing squashed the drawing. The insets live in the draw code. */
+  canvas { width: 100%; display: block; flex: 1 1 auto; min-height: 460px; }
+  @media (max-width: 900px) { canvas { min-height: 400px; } }
+  @media (max-width: 560px) { canvas { min-height: 300px; } }
 
   .tablewrap { margin-top: 22px; overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 660px; }
@@ -142,7 +150,7 @@
 <div class="wrap">
 
   <header>
-    <h1>Kelly bankroll simulator</h1>
+    <h1>Kelly Bet Size Simulator</h1>
     <button class="plain" id="themeBtn">Theme</button>
   </header>
 
@@ -344,7 +352,7 @@
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
 
-    var padL = 66, padR = 16, padT = 12, padB = 28;
+    var padL = 70, padR = 22, padT = 20, padB = 34;
     var pw = W - padL - padR, ph = H - padT - padB, LO = -2, HI = 3, total = S.p.bets;
     function X(i) { return padL + (i / total) * pw; }
     function Y(v) {
@@ -383,22 +391,22 @@
     });
     ctx.globalAlpha = 1;
 
+    // All four medians are drawn identically. Selection is carried by
+    // the faint individual runs behind one of them and by the tab, not
+    // by weighting one curve heavier — these are meant to be compared.
     ctx.lineJoin = "round"; ctx.lineCap = "round";
     S.rules.forEach(function (R) {
-      var isSel = R.rule.key === selected;
       ctx.strokeStyle = C(R.rule.color);
-      ctx.lineWidth = isSel ? 3 : 1.8;
-      ctx.globalAlpha = isSel ? 1 : .7;
+      ctx.lineWidth = 2.4;
       ctx.beginPath();
       for (var j = 0; j < R.med.length; j++) { var x = X(j), y3 = Y(R.med[j]); j ? ctx.lineTo(x, y3) : ctx.moveTo(x, y3); }
       ctx.stroke();
-      ctx.globalAlpha = 1;
       if (R.med.length > 1) {
         var lx = X(R.med.length - 1), ly = Y(R.med[R.med.length - 1]);
         ctx.fillStyle = C(R.rule.color);
-        ctx.beginPath(); ctx.arc(lx, ly, isSel ? 4.5 : 3, 0, 6.284); ctx.fill();
+        ctx.beginPath(); ctx.arc(lx, ly, 4, 0, 6.284); ctx.fill();
         ctx.strokeStyle = C("--bg"); ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(lx, ly, isSel ? 4.5 : 3, 0, 6.284); ctx.stroke();
+        ctx.beginPath(); ctx.arc(lx, ly, 4, 0, 6.284); ctx.stroke();
       }
     });
 
