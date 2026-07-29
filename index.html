@@ -70,9 +70,14 @@
   #startBtn:hover { filter: brightness(1.08); }
   #startBtn.running { background: transparent; color: var(--text); border-color: var(--dim); }
   .progress {
-    flex: 1 1 220px; min-width: 170px; display: flex; align-items: center; gap: 10px;
+    flex: 1 1 160px; min-width: 140px; display: flex; align-items: center; gap: 10px;
     font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums;
   }
+  /* The seed readout is the first thing dropped when the bar gets tight,
+     so the transport never wraps onto a second line and pushes the chart
+     and the slider panel down. */
+  .seed { font-size: 11.5px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  @media (max-width: 1120px) { .seed { display: none; } }
   .track { flex: 1; height: 5px; background: var(--rule); border-radius: 3px; overflow: hidden; }
   .fill { height: 100%; width: 0%; background: var(--c1); }
   .speed { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--dim); }
@@ -159,10 +164,12 @@
   <div class="transport">
     <button id="startBtn">Start</button>
     <button class="plain" id="resetBtn">Reset</button>
+    <button class="plain" id="sampleBtn" title="Re-draw with a different random seed">New sample</button>
     <div class="progress">
       <span id="betCount">bet 0 / 200</span>
       <span class="track"><span class="fill" id="fill"></span></span>
     </div>
+    <span class="seed" id="seedOut"></span>
     <label class="speed">Speed
       <select id="speed">
         <option value="4">Very slow</option>
@@ -227,7 +234,14 @@
   <footer>
     All four rules bet on your <em>believed</em> probability and see identical coin flips, so the
     differences are sizing, not luck. A run counts as ruined below 10% of the starting portfolio.
-    Deterministic: the same settings always give the same result.
+    Deterministic: the same settings and the same seed always give the same result.
+    <br><br>
+    <strong>Press “New sample” and watch which numbers move.</strong> The median barely budges —
+    each bet multiplies the portfolio by (1+f) or (1−f), and multiplication commutes, so the outcome
+    depends only on <em>how many</em> bets you won, not the order. The ruin rate and the mean do
+    move, because both depend on the path: the same win/loss record can survive or be wiped out
+    depending on when the losses arrive. That is why the median is a stable summary and the mean is
+    not, and why ruin is the number worth arguing about.
     <br><br>
     A simulation of a mathematical result, not advice. The same maths ships as
     <code>course_labs/kelly.py</code> — for the table without a browser, run
@@ -250,9 +264,13 @@
   var el = {};
   ["pTrue","pBelief","price","start","bets","runs","vTrue","vBelief","vPrice","vStart","vBets",
    "vRuns","tbody","cv","tabs","themeBtn","startBtn","resetBtn",
-   "betCount","fill","speed","gapnote"].forEach(function (id) { el[id] = document.getElementById(id); });
+   "betCount","fill","speed","gapnote","sampleBtn","seedOut"].forEach(function (id) { el[id] = document.getElementById(id); });
 
   var selected = "full", running = false, raf = null, S = null, hover = null;
+  // Mutable so "New sample" can re-draw. Defaults to the fixed seed the
+  // workbook and the Python module quote, so a fresh page always shows the
+  // canonical numbers.
+  var seed = SEED;
   var lastT = 0, acc = 0, lastStats = 0;
   function C(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
@@ -306,7 +324,7 @@
   function build() {
     var p = params(), f = kelly(p.pBelief, p.price);
     S = {
-      p: p, kelly: f, odds: (1 - p.price) / p.price, bet: 0, rnd: mulberry32(SEED),
+      p: p, kelly: f, odds: (1 - p.price) / p.price, bet: 0, rnd: mulberry32(seed),
       rules: RULES.map(function (rule) {
         var stake = rule.flat !== null ? rule.flat : f * rule.mult;
         var bank = new Float64Array(p.runs), peak = new Float64Array(p.runs);
@@ -584,6 +602,10 @@
     }).join("");
   }
 
+  function drawSeed() {
+    el.seedOut.textContent = "seed " + seed + (seed === SEED ? " (default)" : "");
+  }
+
   function drawTransport() {
     el.betCount.textContent = "bet " + S.bet + " / " + S.p.bets;
     el.fill.style.width = (S.bet / S.p.bets * 100) + "%";
@@ -596,7 +618,7 @@
       : "You believe the edge is <b>" + (g > 0 ? "+" : "") + (g * 100).toFixed(0) +
         " points</b> " + (g > 0 ? "better" : "worse") + " than it really is.";
   }
-  function paintAll() { drawTransport(); drawGap(); drawStats(); drawChart(); }
+  function paintAll() { drawTransport(); drawSeed(); drawGap(); drawStats(); drawChart(); }
 
   function tick(now) {
     if (!running) return;
@@ -642,6 +664,18 @@
 
   el.startBtn.addEventListener("click", function () { running ? stop() : play(); });
   el.resetBtn.addEventListener("click", function () { running = false; reset(false); });
+
+  /* A different sample of the same experiment. The median barely moves —
+     a bankroll multiplied by (1+f) or (1-f) depends only on the win COUNT,
+     not the order, so it is close to fixed given the settings. The ruin
+     rate does move, because ruin depends on the path. Watching which
+     number wobbles and which does not is the point of the button. */
+  el.sampleBtn.addEventListener("click", function () {
+    seed = (Math.floor(Math.random() * 4294967295) + 1) >>> 0;
+    running = false;
+    reset(false);
+    play();
+  });
   el.speed.addEventListener("change", function () { lastT = 0; acc = 0; });
 
   function syncLabels() {
