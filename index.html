@@ -250,7 +250,7 @@
    "vRuns","tbody","cv","tabs","themeBtn","startBtn","resetBtn",
    "betCount","fill","speed","gapnote"].forEach(function (id) { el[id] = document.getElementById(id); });
 
-  var selected = "full", running = false, raf = null, S = null;
+  var selected = "full", running = false, raf = null, S = null, hover = null;
   var lastT = 0, acc = 0, lastStats = 0;
   function C(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
@@ -328,11 +328,16 @@
         if (r < R.hist.length) R.hist[r].push(b);
       }
     }
+    // Median over EVERY run, not just the sampled ones drawn faintly.
+    // Taking it from the 40-path sample disagreed with the table (which
+    // uses all runs) by thousands of dollars, and worse, the small
+    // sample made full Kelly look like it finished up when across all
+    // runs it finishes down — inverting the point of the chart.
     for (var k2 = 0; k2 < S.rules.length; k2++) {
-      var R2 = S.rules[k2], n = R2.hist.length, col = new Array(n);
-      for (var i = 0; i < n; i++) col[i] = R2.hist[i][R2.hist[i].length - 1];
-      col.sort(function (a, b) { return a - b; });
-      R2.med.push(median(col));
+      var R2 = S.rules[k2];
+      var all = Array.prototype.slice.call(R2.bank);
+      all.sort(function (a, b) { return a - b; });
+      R2.med.push(median(all));
     }
     S.bet++;
   }
@@ -363,7 +368,8 @@
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
 
-    var padL = 70, padR = 22, padT = 20, padB = 34;
+    // padR carries the end-of-line value labels, so it is wide, not decorative.
+    var padL = 70, padR = 92, padT = 20, padB = 34;
     var pw = W - padL - padR, ph = H - padT - padB, LO = -2, HI = 3, total = S.p.bets;
     function X(i) { return padL + (i / total) * pw; }
     function Y(v) {
@@ -406,6 +412,7 @@
     // the faint individual runs behind one of them and by the tab, not
     // by weighting one curve heavier — these are meant to be compared.
     ctx.lineJoin = "round"; ctx.lineCap = "round";
+    var ends = [];
     S.rules.forEach(function (R) {
       ctx.strokeStyle = C(R.rule.color);
       ctx.lineWidth = 2.4;
@@ -413,16 +420,107 @@
       for (var j = 0; j < R.med.length; j++) { var x = X(j), y3 = Y(R.med[j]); j ? ctx.lineTo(x, y3) : ctx.moveTo(x, y3); }
       ctx.stroke();
       if (R.med.length > 1) {
-        var lx = X(R.med.length - 1), ly = Y(R.med[R.med.length - 1]);
+        var last = R.med[R.med.length - 1];
+        var lx = X(R.med.length - 1), ly = Y(last);
         ctx.fillStyle = C(R.rule.color);
         ctx.beginPath(); ctx.arc(lx, ly, 4, 0, 6.284); ctx.fill();
         ctx.strokeStyle = C("--bg"); ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(lx, ly, 4, 0, 6.284); ctx.stroke();
+        ends.push({ y: ly, value: last, color: C(R.rule.color) });
       }
     });
 
-    ctx.fillStyle = C("--dim"); ctx.textAlign = "center";
-    ctx.fillText(S.bet + " of " + total + " bets", padL + pw / 2, H - 8);
+    // End-of-line values, nudged apart when curves converge so two
+    // labels never sit on top of each other.
+    if (ends.length) {
+      ends.sort(function (a, b) { return a.y - b.y; });
+      var gapMin = 15;
+      for (var i = 1; i < ends.length; i++) {
+        if (ends[i].y - ends[i - 1].y < gapMin) ends[i].y = ends[i - 1].y + gapMin;
+      }
+      var overflow = ends[ends.length - 1].y - (H - padB);
+      if (overflow > 0) for (var i2 = 0; i2 < ends.length; i2++) ends[i2].y -= overflow;
+
+      ctx.font = "600 12px ui-sans-serif, system-ui, sans-serif";
+      ctx.textAlign = "left"; ctx.textBaseline = "middle";
+      ends.forEach(function (e) {
+        ctx.fillStyle = e.color;
+        ctx.fillText(money(e.value * S.p.start), W - padR + 10, e.y);
+      });
+      ctx.font = "12px ui-sans-serif, system-ui, sans-serif";
+    }
+
+    ctx.fillStyle = C("--dim"); ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(S.bet + " of " + total + " bets", padL + pw / 2, H - 12);
+
+    if (hover) drawHover(ctx, W, H, padL, padR, padB, pw, total, X, Y);
+  }
+
+  /* Crosshair plus every rule's value at the hovered bet. All four are
+     listed rather than just the one under the cursor, because the point
+     of the chart is the comparison between them at a moment. */
+  function drawHover(ctx, W, H, padL, padR, padB, pw, total, X, Y) {
+    var maxIdx = S.rules[0].med.length - 1;
+    if (maxIdx < 1 || hover.x < padL || hover.x > W - padR) return;
+
+    var idx = Math.round(((hover.x - padL) / pw) * total);
+    idx = Math.max(0, Math.min(maxIdx, idx));
+    var hx = X(idx);
+
+    ctx.save();
+    ctx.strokeStyle = C("--dim"); ctx.lineWidth = 1; ctx.globalAlpha = .55;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(Math.round(hx) + .5, 12); ctx.lineTo(Math.round(hx) + .5, H - padB);
+    ctx.stroke();
+    ctx.restore();
+
+    var rows = S.rules.map(function (R) {
+      return { label: R.rule.label, color: C(R.rule.color), value: R.med[idx] };
+    });
+    rows.forEach(function (r, i) {
+      var cy = Y(S.rules[i].med[idx]);
+      ctx.fillStyle = r.color;
+      ctx.beginPath(); ctx.arc(hx, cy, 3.5, 0, 6.284); ctx.fill();
+      ctx.strokeStyle = C("--bg"); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(hx, cy, 3.5, 0, 6.284); ctx.stroke();
+    });
+
+    ctx.font = "12px ui-sans-serif, system-ui, sans-serif";
+    var valueW = 0;
+    rows.forEach(function (r) {
+      valueW = Math.max(valueW, ctx.measureText(money(r.value * S.p.start)).width);
+    });
+    var labelW = 0;
+    rows.forEach(function (r) { labelW = Math.max(labelW, ctx.measureText(r.label).width); });
+
+    var boxW = 20 + labelW + 16 + valueW + 12;
+    var boxH = 22 + rows.length * 17 + 8;
+    var bx = hx + 14;
+    // Flip before reaching the label gutter, not the canvas edge, or the
+    // tooltip sits on top of the end-of-line values.
+    if (bx + boxW > W - padR) bx = hx - 14 - boxW;
+    var by = Math.min(Math.max(12, hover.y - boxH / 2), H - padB - boxH);
+
+    ctx.fillStyle = C("--bg"); ctx.globalAlpha = .96;
+    ctx.strokeStyle = C("--rule"); ctx.lineWidth = 1;
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(bx, by, boxW, boxH, 6); ctx.fill(); ctx.stroke(); }
+    else { ctx.fillRect(bx, by, boxW, boxH); ctx.strokeRect(bx, by, boxW, boxH); }
+    ctx.globalAlpha = 1;
+
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    ctx.fillStyle = C("--dim");
+    ctx.fillText("bet " + idx + " of " + total, bx + 12, by + 14);
+
+    rows.forEach(function (r, i) {
+      var ry = by + 30 + i * 17;
+      ctx.fillStyle = r.color;
+      ctx.beginPath(); ctx.arc(bx + 15, ry, 3.5, 0, 6.284); ctx.fill();
+      ctx.fillStyle = C("--text");
+      ctx.fillText(r.label, bx + 24, ry);
+      ctx.textAlign = "right";
+      ctx.fillText(money(r.value * S.p.start), bx + boxW - 12, ry);
+      ctx.textAlign = "left";
+    });
   }
 
   function drawStats() {
@@ -532,6 +630,18 @@
     paintTabs(); paintAll();
   });
   window.addEventListener("resize", function () { if (S) drawChart(); });
+
+  // The canvas has no CSS padding, so client coordinates map straight
+  // onto the drawing space with no offset to correct for.
+  el.cv.addEventListener("pointermove", function (ev) {
+    var r = el.cv.getBoundingClientRect();
+    hover = { x: ev.clientX - r.left, y: ev.clientY - r.top };
+    if (!running && S) drawChart();
+  });
+  el.cv.addEventListener("pointerleave", function () {
+    hover = null;
+    if (!running && S) drawChart();
+  });
 
   syncLabels(); paintTabs(); build(); paintAll();
 })();
