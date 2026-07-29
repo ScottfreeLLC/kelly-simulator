@@ -186,9 +186,9 @@
       </div>
       <div class="gapnote" id="gapnote"></div>
       <div>
-        <div class="ctl-top"><span class="ctl-name">Contract price</span><span class="ctl-val" id="vPrice"></span></div>
+        <div class="ctl-top"><span class="ctl-name">Break-even win rate</span><span class="ctl-val" id="vPrice"></span></div>
         <input type="range" id="price" min="0.05" max="0.95" step="0.01" value="0.50">
-        <div class="ctl-hint">Costs this to buy, pays $1 if it resolves YES.</div>
+        <div class="ctl-hint">The win rate at which this bet breaks even, and the odds it pays. You have edge only when your belief sits above it.</div>
       </div>
       <div>
         <div class="ctl-top"><span class="ctl-name">Starting portfolio</span><span class="ctl-val" id="vStart"></span></div>
@@ -276,6 +276,17 @@
     return "$" + Math.round(x);
   }
   function pc(x) { return (x * 100).toFixed(1) + "%"; }
+
+  /* A break-even rate of c implies odds of (1-c)/c to one. Shown
+     alongside the rate because the two together are the whole geometry
+     of the bet: a 10% break-even pays 9:1 and loses 90% of the time,
+     which is why Kelly stakes it far smaller than an even-money bet
+     carrying the same edge. */
+  function oddsLabel(c) {
+    var b = (1 - c) / c;
+    var side = function (x) { return x >= 10 ? x.toFixed(0) : String(Math.round(x * 10) / 10); };
+    return b >= 1 ? side(b) + ":1" : "1:" + side(1 / b);
+  }
   function params() {
     return {
       pTrue: +el.pTrue.value, pBelief: +el.pBelief.value, price: +el.price.value,
@@ -493,7 +504,7 @@
     var p = params();
     el.vTrue.textContent = (p.pTrue * 100).toFixed(0) + "%";
     el.vBelief.textContent = (p.pBelief * 100).toFixed(0) + "%";
-    el.vPrice.textContent = (p.price * 100).toFixed(0) + "c";
+    el.vPrice.textContent = (p.price * 100).toFixed(0) + "% · " + oddsLabel(p.price);
     el.vStart.textContent = money(p.start);
     el.vBets.textContent = p.bets;
     el.vRuns.textContent = p.runs.toLocaleString();
