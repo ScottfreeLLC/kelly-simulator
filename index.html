@@ -17,6 +17,7 @@
     --c3: #0f7fbf;   /* Quarter Kelly — azure   */
     --c4: #1d8a52;   /* Flat 2%       — green   */
     --ruinband: rgba(31, 29, 26, .07);
+    --trace: #8b94a3;   /* individual runs: neutral, so they recede */
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -24,19 +25,20 @@
       --text: #ebe8e2; --dim: #8d8880;
       --c1: #ff5aa8; --c2: #ffa22e; --c3: #4bb4f0; --c4: #48ca82;
       --ruinband: rgba(255, 255, 255, .06);
+      --trace: #737f92;
     }
   }
   :root[data-theme="light"] {
     --bg: #fcfbf9; --panel: #f1efe9; --rule: #dbd7cf;
     --text: #1f1d1a; --dim: #6b665e;
     --c1: #c9187e; --c2: #d97a00; --c3: #0f7fbf; --c4: #1d8a52;
-    --ruinband: rgba(31,29,26,.07);
+    --ruinband: rgba(31,29,26,.07); --trace: #8b94a3;
   }
   :root[data-theme="dark"] {
     --bg: #131519; --panel: #1b1e24; --rule: #2f333c;
     --text: #ebe8e2; --dim: #8d8880;
     --c1: #ff5aa8; --c2: #ffa22e; --c3: #4bb4f0; --c4: #48ca82;
-    --ruinband: rgba(255,255,255,.06);
+    --ruinband: rgba(255,255,255,.06); --trace: #737f92;
   }
 
   * { box-sizing: border-box; }
@@ -428,7 +430,10 @@
 
     var sel = S.rules.filter(function (r) { return r.rule.key === selected; })[0];
 
-    ctx.strokeStyle = C(sel.rule.color); ctx.lineWidth = 1; ctx.globalAlpha = .3;
+    // Neutral rather than the selected rule's colour: these are context,
+    // not signal. Tinting them meant the cloud fought the median drawn
+    // inside it and the whole chart changed hue on every tab switch.
+    ctx.strokeStyle = C("--trace"); ctx.lineWidth = 1; ctx.globalAlpha = .24;
     sel.hist.forEach(function (c) {
       ctx.beginPath();
       for (var i = 0; i < c.length; i++) { var x = X(i), y2 = Y(c[i]); i ? ctx.lineTo(x, y2) : ctx.moveTo(x, y2); }
